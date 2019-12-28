@@ -45,8 +45,6 @@ class MainMenuScreen(private val game: JulSpelet) : KtxScreen {
 
   override fun render(delta: Float) {
     Gdx.gl.glClearColor(0f, 0f, 0.2f, 1f)
-    //Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
-
 
     camera.update()
     game.batch.projectionMatrix = camera.combined
@@ -55,8 +53,6 @@ class MainMenuScreen(private val game: JulSpelet) : KtxScreen {
       it.draw(mainBackground, 0f, 0f)
       it.draw(mainTitle, 0f, 0f)
       it.draw(playBtnImg, 800 / 2 - 200 / 2f, 210f)
-      //game.font.draw(game.batch, "Welcome to Drop!!! ", 100f, 150f)
-      //game.font.draw(game.batch, "Tap anywhere to begin!", 100f, 100f)
     }
 
     if (Gdx.input.isTouched) {
@@ -81,8 +77,6 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   private val grid = Grid(25, 15)
   private val avatar: GridOccupant = GridOccupant(x = 0,
       y = 0,
-      width = 32f,
-      height = 32f,
       image = playerImage)
   private val items = mutableListOf<GridOccupant>()
   private val hardLevel = """
@@ -98,14 +92,18 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
 
   override fun show() {
     Gdx.input.inputProcessor = AvatarInputProcessor(avatar, items)
+    initializeMap()
+  }
+
+  private fun initializeMap() {
     items.clear()
     hardLevel.lines().forEachIndexed { y, line ->
       line.forEachIndexed { x, square ->
         when (square) {
-          'o' -> items.add(GridOccupant(x, y, 32f, 32f, boxImage))
-          'x' -> items.add(GridOccupant(x, y, 32f, 32f, brickWallImage, false))
-          'd' -> items.add(GridOccupant(x, y, 32f, 32f, doorImage, false))
-          'k' -> items.add(GridOccupant(x, y, 32f, 32f, keyImage, false))
+          'o' -> items.add(GridOccupant(x, y, boxImage))
+          'x' -> items.add(GridOccupant(x, y, brickWallImage, false))
+          'd' -> items.add(GridOccupant(x, y, doorImage, false))
+          'k' -> items.add(GridOccupant(x, y, keyImage, false, consumable = true))
           'P' -> {
             avatar.x = x
             avatar.y = y
@@ -156,9 +154,14 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     class Nothing : Movement(0, 0)
   }
 
-  data class GridOccupant(var x: Int, var y: Int, val width: Float, val height: Float, val image: Texture, val canMove: Boolean = true)
+  data class GridOccupant(
+      var x: Int,
+      var y: Int,
+      val image: Texture,
+      val canMove: Boolean = true,
+      val consumable: Boolean = false)
 
-  class AvatarInputProcessor(private val avatar: GridOccupant, private val items: List<GridOccupant>) : KtxInputAdapter {
+  class AvatarInputProcessor(private val avatar: GridOccupant, private val items: MutableList<GridOccupant>) : KtxInputAdapter {
     override fun keyDown(keycode: Int): Boolean {
       val movement = when (keycode) {
         Input.Keys.LEFT -> Movement.Left()
@@ -167,8 +170,27 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
         Input.Keys.UP -> Movement.Up()
         else -> Movement.Nothing()
       }
-      attemptMove(avatar, movement)
+      val actionPerformed =
+          attemptConsume(avatar, movement)
+              || attemptMove(avatar, movement)
       return true
+    }
+
+    private fun attemptConsume(occupant: GridOccupant, movement: Movement): Boolean {
+      val wanted = occupant.positionAfterMoving(movement)
+      if (wanted.outOfBounds()) {
+        return false
+      }
+
+      items.forEach { otherOccupant ->
+        if (wanted.overlaps(otherOccupant) && otherOccupant.consumable) {
+          occupant.move(movement)
+          // TODO occupant.consume(otherOccupant)
+          items.remove(otherOccupant)
+          return true
+        }
+      }
+      return false
     }
 
     private fun attemptMove(occupant: GridOccupant, movement: Movement): Boolean {
