@@ -149,7 +149,7 @@ class AdventureGameScreen(julSpelet: JulSpelet): KtxScreen {
 }
 
 private fun AdventureGameScreen.Position.outOfBounds(): Boolean {
-  return x > 25 || x < 0 || y > 15 || y < 0
+  return x > 24 || x < 0 || y > 15 || y < 0
 }
 
 private fun AdventureGameScreen.GridOccupant.positionAfterMoving(movement: AdventureGameScreen.Movement): AdventureGameScreen.Position {
