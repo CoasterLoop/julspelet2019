@@ -98,6 +98,12 @@ class AdventureGameScreen(julSpelet: JulSpelet): KtxScreen {
 
   data class Grid(val width: Int, val height: Int)
 
+  data class Position(val x: Int, val y: Int) {
+    fun overlaps(occupant: GridOccupant): Boolean {
+      return occupant.x == this.x && occupant.y == this.y
+    }
+  }
+
   sealed class Movement(val x: Int, val y: Int) {
     class Left: Movement(-1, 0)
     class Right: Movement(1, 0)
@@ -117,15 +123,37 @@ class AdventureGameScreen(julSpelet: JulSpelet): KtxScreen {
         Input.Keys.UP -> Movement.Up()
         else -> Movement.Nothing()
       }
-      avatar.move(movement)
-      items.forEach {
-        if (avatar.overlaps(it)) {
-          it.move(movement)
-        }
-      }
+      attemptMove(avatar, movement)
       return true
     }
+
+    private fun attemptMove(occupant: GridOccupant, movement: Movement): Boolean {
+      val wanted = occupant.positionAfterMoving(movement)
+      if (wanted.outOfBounds()) {
+        return false
+      }
+      var canMove = true
+      items.forEach { otherOccupant ->
+        if (wanted.overlaps(otherOccupant)) {
+          if (!attemptMove(otherOccupant, movement)) {
+            canMove = false
+          }
+        }
+      }
+      if (canMove) {
+        occupant.move(movement)
+      }
+      return canMove
+    }
   }
+}
+
+private fun AdventureGameScreen.Position.outOfBounds(): Boolean {
+  return x > 25 || x < 0 || y > 15 || y < 0
+}
+
+private fun AdventureGameScreen.GridOccupant.positionAfterMoving(movement: AdventureGameScreen.Movement): AdventureGameScreen.Position {
+  return AdventureGameScreen.Position(this.x + movement.x, this.y + movement.y)
 }
 
 private fun AdventureGameScreen.GridOccupant.overlaps(occupant: AdventureGameScreen.GridOccupant): Boolean {
