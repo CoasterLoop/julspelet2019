@@ -19,6 +19,7 @@ class JulSpelet : KtxGame<Screen>() {
   lateinit var batch: SpriteBatch
     private set
 
+
   override fun create() {
     batch = SpriteBatch()
     font = BitmapFont()
@@ -34,20 +35,28 @@ class JulSpelet : KtxGame<Screen>() {
 }
 
 class MainMenuScreen(private val game: JulSpelet) : KtxScreen {
+  private val mainBackground = Texture(Gdx.files.internal("MainBackround.png"))
+  private val mainTitle = Texture(Gdx.files.internal("MainTitle.png"))
+  private val playBtnImg = Texture(Gdx.files.internal("ButtonPlay.png"))
+
   private val camera = OrthographicCamera(800f, 480f).apply {
     setToOrtho(false)
   }
 
   override fun render(delta: Float) {
     Gdx.gl.glClearColor(0f, 0f, 0.2f, 1f)
-    Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+    //Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+
 
     camera.update()
     game.batch.projectionMatrix = camera.combined
 
     game.batch.use {
-      game.font.draw(game.batch, "Welcome to Drop!!! ", 100f, 150f)
-      game.font.draw(game.batch, "Tap anywhere to begin!", 100f, 100f)
+      it.draw(mainBackground, 0f, 0f)
+      it.draw(mainTitle, 0f, 0f)
+      it.draw(playBtnImg, 800 / 2 - 200 / 2f, 210f)
+      //game.font.draw(game.batch, "Welcome to Drop!!! ", 100f, 150f)
+      //game.font.draw(game.batch, "Tap anywhere to begin!", 100f, 100f)
     }
 
     if (Gdx.input.isTouched) {
@@ -56,31 +65,61 @@ class MainMenuScreen(private val game: JulSpelet) : KtxScreen {
     }
   }
 }
-class AdventureGameScreen(julSpelet: JulSpelet): KtxScreen {
+
+class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   private val batch = julSpelet.batch
   private val font = julSpelet.font
-  private val playerImage = Texture(Gdx.files.internal("player.png"))
-  private val poopImage = Texture(Gdx.files.internal("poop.png"))
+  private val playerImage = Texture(Gdx.files.internal("JoshuaFrontStationary.png"))
+  private val boxImage = Texture(Gdx.files.internal("BoxWood.png"))
+  private val brickWallImage = Texture(Gdx.files.internal("BrickWall.png"))
+  private val keyImage = Texture(Gdx.files.internal("GoldenKey.png"))
+  private val doorImage = Texture(Gdx.files.internal("BrickWallLocked.png"))
+  private val grass = Texture(Gdx.files.internal("Grass.png"))
   private val camera = OrthographicCamera(800f, 480f).apply {
     setToOrtho(false)
   }
   private val grid = Grid(25, 15)
-  private val avatar: GridOccupant = GridOccupant(x = 5,
-    y = 5,
-    width = 32f,
-    height = 32f)
-  private val items = listOf(
-      GridOccupant(10, 10, 32f, 32f),
-      GridOccupant(15, 8, 32f, 32f)
-      )
+  private val avatar: GridOccupant = GridOccupant(x = 0,
+      y = 0,
+      width = 32f,
+      height = 32f,
+      image = playerImage)
+  private val items = mutableListOf<GridOccupant>()
+  private val hardLevel = """
+    ...x...
+    P..o...
+    ...x.o.
+    xxxxx.x
+    .......
+    x....x.
+    ko...d.
+    x......
+  """.trimIndent()
 
   override fun show() {
     Gdx.input.inputProcessor = AvatarInputProcessor(avatar, items)
+    items.clear()
+    hardLevel.lines().forEachIndexed { y, line ->
+      line.forEachIndexed { x, square ->
+        when (square) {
+          'o' -> items.add(GridOccupant(x, y, 32f, 32f, boxImage))
+          'x' -> items.add(GridOccupant(x, y, 32f, 32f, brickWallImage, false))
+          'd' -> items.add(GridOccupant(x, y, 32f, 32f, doorImage, false))
+          'k' -> items.add(GridOccupant(x, y, 32f, 32f, keyImage, false))
+          'P' -> {
+            avatar.x = x
+            avatar.y = y
+          }
+        }
+      }
+    }
   }
 
   override fun render(delta: Float) {
     Gdx.gl.glClearColor(0f, 0f, 0.2f, 1f)
     Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+
+
     if (avatar.x < 0) avatar.x = 0
     if (avatar.x >= grid.width) avatar.x = grid.width - 1
     if (avatar.y < 0) avatar.y = 0
@@ -89,9 +128,14 @@ class AdventureGameScreen(julSpelet: JulSpelet): KtxScreen {
     camera.update()
     batch.projectionMatrix = camera.combined
     batch.use { batch ->
-      batch.draw(playerImage, avatar.x * 32f, avatar.y * 32f)
+      for (gridX: Int in 0..grid.width) {
+        for (gridY: Int in 0..grid.height) {
+          batch.draw(grass, gridX * 32f, gridY * 32f)
+        }
+      }
+      batch.draw(avatar.image, avatar.x * 32f, avatar.y * 32f)
       items.forEach {
-        batch.draw(poopImage, it.x * 32f, it.y * 32f)
+        batch.draw(it.image, it.x * 32f, it.y * 32f)
       }
     }
   }
@@ -105,18 +149,18 @@ class AdventureGameScreen(julSpelet: JulSpelet): KtxScreen {
   }
 
   sealed class Movement(val x: Int, val y: Int) {
-    class Left: Movement(-1, 0)
-    class Right: Movement(1, 0)
-    class Up: Movement(0, 1)
-    class Down: Movement(0, -1)
-    class Nothing: Movement(0, 0)
+    class Left : Movement(-1, 0)
+    class Right : Movement(1, 0)
+    class Up : Movement(0, 1)
+    class Down : Movement(0, -1)
+    class Nothing : Movement(0, 0)
   }
 
-  data class GridOccupant(var x: Int, var y: Int, val width: Float, val height: Float)
+  data class GridOccupant(var x: Int, var y: Int, val width: Float, val height: Float, val image: Texture, val canMove: Boolean = true)
 
-  class AvatarInputProcessor(private val avatar: GridOccupant, private val items: List<GridOccupant>): KtxInputAdapter {
+  class AvatarInputProcessor(private val avatar: GridOccupant, private val items: List<GridOccupant>) : KtxInputAdapter {
     override fun keyDown(keycode: Int): Boolean {
-      val movement = when(keycode) {
+      val movement = when (keycode) {
         Input.Keys.LEFT -> Movement.Left()
         Input.Keys.RIGHT -> Movement.Right()
         Input.Keys.DOWN -> Movement.Down()
@@ -129,7 +173,7 @@ class AdventureGameScreen(julSpelet: JulSpelet): KtxScreen {
 
     private fun attemptMove(occupant: GridOccupant, movement: Movement): Boolean {
       val wanted = occupant.positionAfterMoving(movement)
-      if (wanted.outOfBounds()) {
+      if (!occupant.canMove || wanted.outOfBounds()) {
         return false
       }
       var canMove = true
@@ -149,7 +193,7 @@ class AdventureGameScreen(julSpelet: JulSpelet): KtxScreen {
 }
 
 private fun AdventureGameScreen.Position.outOfBounds(): Boolean {
-  return x > 24 || x < 0 || y > 15 || y < 0
+  return x >= 25 || x < 0 || y >= 15 || y < 0
 }
 
 private fun AdventureGameScreen.GridOccupant.positionAfterMoving(movement: AdventureGameScreen.Movement): AdventureGameScreen.Position {
