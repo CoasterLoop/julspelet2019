@@ -19,6 +19,8 @@ class JulSpelet : KtxGame<Screen>() {
   lateinit var batch: SpriteBatch
     private set
 
+
+
   override fun create() {
     batch = SpriteBatch()
     font = BitmapFont()
@@ -34,20 +36,28 @@ class JulSpelet : KtxGame<Screen>() {
 }
 
 class MainMenuScreen(private val game: JulSpelet) : KtxScreen {
+  private val mainBackground = Texture(Gdx.files.internal("MainBackround.png"))
+  private val mainTitle = Texture(Gdx.files.internal("MainTitle.png"))
+  private val playBtnImg = Texture(Gdx.files.internal("ButtonPlay.png"))
+
   private val camera = OrthographicCamera(800f, 480f).apply {
     setToOrtho(false)
   }
 
   override fun render(delta: Float) {
     Gdx.gl.glClearColor(0f, 0f, 0.2f, 1f)
-    Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+    //Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+
 
     camera.update()
     game.batch.projectionMatrix = camera.combined
 
     game.batch.use {
-      game.font.draw(game.batch, "Welcome to Drop!!! ", 100f, 150f)
-      game.font.draw(game.batch, "Tap anywhere to begin!", 100f, 100f)
+      it.draw(mainBackground, 0f, 0f)
+      it.draw(mainTitle, 0f, 0f)
+      it.draw(playBtnImg, 800/2-200/2f, 210f)
+      //game.font.draw(game.batch, "Welcome to Drop!!! ", 100f, 150f)
+      //game.font.draw(game.batch, "Tap anywhere to begin!", 100f, 100f)
     }
 
     if (Gdx.input.isTouched) {
@@ -59,8 +69,9 @@ class MainMenuScreen(private val game: JulSpelet) : KtxScreen {
 class AdventureGameScreen(julSpelet: JulSpelet): KtxScreen {
   private val batch = julSpelet.batch
   private val font = julSpelet.font
-  private val playerImage = Texture(Gdx.files.internal("player.png"))
-  private val poopImage = Texture(Gdx.files.internal("poop.png"))
+  private val playerImage = Texture(Gdx.files.internal("JoshuaFrontStationary.png"))
+  private val boxImage = Texture(Gdx.files.internal("BoxWood.png"))
+  private val grass = Texture(Gdx.files.internal("Grass.png"))
   private val camera = OrthographicCamera(800f, 480f).apply {
     setToOrtho(false)
   }
@@ -81,6 +92,8 @@ class AdventureGameScreen(julSpelet: JulSpelet): KtxScreen {
   override fun render(delta: Float) {
     Gdx.gl.glClearColor(0f, 0f, 0.2f, 1f)
     Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+
+
     if (avatar.x < 0) avatar.x = 0
     if (avatar.x >= grid.width) avatar.x = grid.width - 1
     if (avatar.y < 0) avatar.y = 0
@@ -89,9 +102,14 @@ class AdventureGameScreen(julSpelet: JulSpelet): KtxScreen {
     camera.update()
     batch.projectionMatrix = camera.combined
     batch.use { batch ->
+      for (gridX: Int in 0..grid.width) {
+        for (gridY: Int in 0..grid.height) {
+          batch.draw(grass, gridX * 32f, gridY * 32f)
+        }
+      }
       batch.draw(playerImage, avatar.x * 32f, avatar.y * 32f)
       items.forEach {
-        batch.draw(poopImage, it.x * 32f, it.y * 32f)
+        batch.draw(boxImage, it.x * 32f, it.y * 32f)
       }
     }
   }
@@ -149,7 +167,7 @@ class AdventureGameScreen(julSpelet: JulSpelet): KtxScreen {
 }
 
 private fun AdventureGameScreen.Position.outOfBounds(): Boolean {
-  return x > 24 || x < 0 || y > 15 || y < 0
+  return x >= 25 || x < 0 || y >= 15 || y < 0
 }
 
 private fun AdventureGameScreen.GridOccupant.positionAfterMoving(movement: AdventureGameScreen.Movement): AdventureGameScreen.Position {
