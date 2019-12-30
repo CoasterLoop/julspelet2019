@@ -71,6 +71,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   private val keyImage = Texture(Gdx.files.internal("GoldenKey.png"))
   private val doorImage = Texture(Gdx.files.internal("BrickWallLocked.png"))
   private val grass = Texture(Gdx.files.internal("Grass.png"))
+  private val rockyGrass = Texture(Gdx.files.internal("RockyGrass.png"))
   private val camera = OrthographicCamera(800f, 480f).apply {
     setToOrtho(false)
   }
@@ -83,7 +84,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     ...x...
     P..o...
     ...x.o.
-    xxxxx.x
+    xxxxx^x
     .......
     x....x.
     ko...d.
@@ -104,6 +105,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
           'x' -> items.add(GridOccupant(x, y, brickWallImage, false))
           'd' -> items.add(GridOccupant(x, y, doorImage, false))
           'k' -> items.add(GridOccupant(x, y, keyImage, false, consumable = true))
+          '^' -> items.add(GridOccupant(x, y, rockyGrass, false))
           'P' -> {
             avatar.x = x
             avatar.y = y
@@ -117,24 +119,29 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     Gdx.gl.glClearColor(0f, 0f, 0.2f, 1f)
     Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
 
-
-    if (avatar.x < 0) avatar.x = 0
-    if (avatar.x >= grid.width) avatar.x = grid.width - 1
-    if (avatar.y < 0) avatar.y = 0
-    if (avatar.y >= grid.height) avatar.y = grid.height - 1
-
     camera.update()
     batch.projectionMatrix = camera.combined
     batch.use { batch ->
-      for (gridX: Int in 0..grid.width) {
-        for (gridY: Int in 0..grid.height) {
-          batch.draw(grass, gridX * 32f, gridY * 32f)
-        }
+      renderGround(batch)
+      renderPlayer(batch)
+      renderItems(batch)
+    }
+  }
+
+  private fun renderGround(batch: SpriteBatch) {
+    for (gridX: Int in 0..grid.width) {
+      for (gridY: Int in 0..grid.height) {
+        batch.draw(grass, gridX * 32f, gridY * 32f)
       }
-      batch.draw(avatar.image, avatar.x * 32f, avatar.y * 32f)
-      items.forEach {
-        batch.draw(it.image, it.x * 32f, it.y * 32f)
-      }
+    }
+  }
+
+  private fun renderPlayer(batch: SpriteBatch) {
+    batch.draw(avatar.image, avatar.x * 32f, avatar.y * 32f)
+  }
+  private fun renderItems(batch: SpriteBatch) {
+    items.forEach {
+      batch.draw(it.image, it.x * 32f, it.y * 32f)
     }
   }
 
