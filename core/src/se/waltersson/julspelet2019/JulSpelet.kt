@@ -76,7 +76,8 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     setToOrtho(false)
   }
   private val grid = Grid(25, 15)
-  private val avatar: GridOccupant = GridOccupant(x = 0,
+  private val avatar: GridOccupant = GridOccupant.Player(
+      x = 0,
       y = 0,
       image = playerImage)
   private val items = mutableListOf<GridOccupant>()
@@ -101,11 +102,11 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     hardLevel.lines().forEachIndexed { y, line ->
       line.forEachIndexed { x, square ->
         when (square) {
-          'o' -> items.add(GridOccupant(x, y, boxImage))
-          'x' -> items.add(GridOccupant(x, y, brickWallImage, false))
-          'd' -> items.add(GridOccupant(x, y, doorImage, false))
-          'k' -> items.add(GridOccupant(x, y, keyImage, false, consumable = true))
-          '^' -> items.add(GridOccupant(x, y, rockyGrass, false))
+          'o' -> items.add(GridOccupant.Movable(x, y, boxImage))
+          'x' -> items.add(GridOccupant.Immovable(x, y, brickWallImage))
+          'd' -> items.add(GridOccupant.Immovable(x, y, doorImage))
+          'k' -> items.add(GridOccupant.Consumable(x, y, keyImage))
+          '^' -> items.add(GridOccupant.Clutter(x, y, rockyGrass))
           'P' -> {
             avatar.x = x
             avatar.y = y
@@ -123,8 +124,8 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     batch.projectionMatrix = camera.combined
     batch.use { batch ->
       renderGround(batch)
-      renderPlayer(batch)
       renderItems(batch)
+      renderPlayer(batch)
     }
   }
 
@@ -139,6 +140,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   private fun renderPlayer(batch: SpriteBatch) {
     batch.draw(avatar.image, avatar.x * 32f, avatar.y * 32f)
   }
+
   private fun renderItems(batch: SpriteBatch) {
     items.forEach {
       batch.draw(it.image, it.x * 32f, it.y * 32f)
@@ -161,12 +163,18 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     class Nothing : Movement(0, 0)
   }
 
-  data class GridOccupant(
+  sealed class GridOccupant(
       var x: Int,
       var y: Int,
       val image: Texture,
-      val canMove: Boolean = true,
-      val consumable: Boolean = false)
+      val canMove: Boolean = false) {
+
+    class Consumable(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
+    class Movable(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image, canMove = true)
+    class Immovable(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
+    class Clutter(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
+    class Player(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image, canMove = true)
+  }
 
   class AvatarInputProcessor(private val avatar: GridOccupant, private val items: MutableList<GridOccupant>) : KtxInputAdapter {
     override fun keyDown(keycode: Int): Boolean {
@@ -190,7 +198,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
       }
 
       items.forEach { otherOccupant ->
-        if (wanted.overlaps(otherOccupant) && otherOccupant.consumable) {
+        if (wanted.overlaps(otherOccupant) && otherOccupant is GridOccupant.Consumable) {
           occupant.move(movement)
           // TODO occupant.consume(otherOccupant)
           items.remove(otherOccupant)
@@ -208,7 +216,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
       var canMove = true
       items.forEach { otherOccupant ->
         if (wanted.overlaps(otherOccupant)) {
-          if (!attemptMove(otherOccupant, movement)) {
+          if (!occupant.canOverlap(otherOccupant) && !attemptMove(otherOccupant, movement)) {
             canMove = false
           }
         }
@@ -219,6 +227,12 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
       return canMove
     }
   }
+}
+
+private fun AdventureGameScreen.GridOccupant.canOverlap(otherOccupant: AdventureGameScreen.GridOccupant): Boolean {
+  return this is AdventureGameScreen.GridOccupant.Player
+      && (otherOccupant is AdventureGameScreen.GridOccupant.Clutter
+      || otherOccupant is AdventureGameScreen.GridOccupant.Consumable)
 }
 
 private fun AdventureGameScreen.Position.outOfBounds(): Boolean {
