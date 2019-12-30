@@ -185,27 +185,8 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
         Input.Keys.UP -> Movement.Up()
         else -> Movement.Nothing()
       }
-      val actionPerformed =
-          attemptConsume(avatar, movement)
-              || attemptMove(avatar, movement)
+      attemptMove(avatar, movement)
       return true
-    }
-
-    private fun attemptConsume(occupant: GridOccupant, movement: Movement): Boolean {
-      val wanted = occupant.positionAfterMoving(movement)
-      if (wanted.outOfBounds()) {
-        return false
-      }
-
-      items.forEach { otherOccupant ->
-        if (wanted.overlaps(otherOccupant) && otherOccupant is GridOccupant.Consumable) {
-          occupant.move(movement)
-          // TODO occupant.consume(otherOccupant)
-          items.remove(otherOccupant)
-          return true
-        }
-      }
-      return false
     }
 
     private fun attemptMove(occupant: GridOccupant, movement: Movement): Boolean {
@@ -214,15 +195,19 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
         return false
       }
       var canMove = true
+      val consumedItems = mutableListOf<GridOccupant.Consumable>()
       items.forEach { otherOccupant ->
         if (wanted.overlaps(otherOccupant)) {
-          if (!occupant.canOverlap(otherOccupant) && !attemptMove(otherOccupant, movement)) {
+          if (otherOccupant is GridOccupant.Consumable) {
+            consumedItems.add(otherOccupant)
+          } else if (!occupant.canOverlap(otherOccupant) && !attemptMove(otherOccupant, movement)) {
             canMove = false
           }
         }
       }
       if (canMove) {
         occupant.move(movement)
+        items.removeAll(consumedItems)
       }
       return canMove
     }
