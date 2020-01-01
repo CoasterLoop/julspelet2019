@@ -64,7 +64,6 @@ class MainMenuScreen(private val game: JulSpelet) : KtxScreen {
 
 class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   private val batch = julSpelet.batch
-  private val font = julSpelet.font
   private val playerImage = Texture(Gdx.files.internal("JoshuaFrontStationary.png"))
   private val boxImage = Texture(Gdx.files.internal("BoxWood.png"))
   private val brickWallImage = Texture(Gdx.files.internal("BrickWall.png"))
@@ -82,14 +81,14 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
       image = playerImage)
   private val items = mutableListOf<GridOccupant>()
   private val hardLevel = """
-    ...x...
-    P..o...
-    ...x.o.
-    xxxxx^x
-    .......
-    x....x.
-    ko...d.
-    x......
+    ...x..kx
+    P..o...x
+    ...x.o.x
+    xxxxx^x.
+    x.....xx
+    ko....dd
+    x.....xx
+    xxxxxxx.
   """.trimIndent()
 
   override fun show() {
@@ -104,7 +103,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
         when (square) {
           'o' -> items.add(GridOccupant.Movable(x, y, boxImage))
           'x' -> items.add(GridOccupant.Immovable(x, y, brickWallImage))
-          'd' -> items.add(GridOccupant.Immovable(x, y, doorImage))
+          'd' -> items.add(GridOccupant.Door(x, y, doorImage))
           'k' -> items.add(GridOccupant.Consumable(x, y, keyImage))
           '^' -> items.add(GridOccupant.Clutter(x, y, rockyGrass))
           'P' -> {
@@ -174,9 +173,13 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     class Immovable(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
     class Clutter(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
     class Player(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image, canMove = true)
+    class Door(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
+
   }
 
   class AvatarInputProcessor(private val avatar: GridOccupant, private val items: MutableList<GridOccupant>) : KtxInputAdapter {
+    private var keys: Int = 0
+
     override fun keyDown(keycode: Int): Boolean {
       val movement = when (keycode) {
         Input.Keys.LEFT -> Movement.Left()
@@ -195,11 +198,16 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
         return false
       }
       var canMove = true
-      val consumedItems = mutableListOf<GridOccupant.Consumable>()
+      val consumedItems = mutableListOf<GridOccupant>()
       items.forEach { otherOccupant ->
         if (wanted.overlaps(otherOccupant)) {
           if (otherOccupant is GridOccupant.Consumable) {
             consumedItems.add(otherOccupant)
+            keys += 1
+            println("Picked up a key, you now have $keys keys")
+          } else if (otherOccupant is GridOccupant.Door && keys > 0) {
+            consumedItems.add(otherOccupant)
+            keys -= 1
           } else if (!occupant.canOverlap(otherOccupant) && !attemptMove(otherOccupant, movement)) {
             canMove = false
           }
@@ -226,10 +234,6 @@ private fun AdventureGameScreen.Position.outOfBounds(): Boolean {
 
 private fun AdventureGameScreen.GridOccupant.positionAfterMoving(movement: AdventureGameScreen.Movement): AdventureGameScreen.Position {
   return AdventureGameScreen.Position(this.x + movement.x, this.y + movement.y)
-}
-
-private fun AdventureGameScreen.GridOccupant.overlaps(occupant: AdventureGameScreen.GridOccupant): Boolean {
-  return this.x == occupant.x && this.y == occupant.y
 }
 
 private fun AdventureGameScreen.GridOccupant.move(movement: AdventureGameScreen.Movement) {
