@@ -64,6 +64,7 @@ class MainMenuScreen(private val game: JulSpelet) : KtxScreen {
 
 class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   private val batch = julSpelet.batch
+  private val font = BitmapFont()
   private val playerImage = Texture(Gdx.files.internal("JoshuaFrontStationary.png"))
   private val boxImage = Texture(Gdx.files.internal("BoxWood.png"))
   private val brickWallImage = Texture(Gdx.files.internal("BrickWall.png"))
@@ -75,7 +76,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     setToOrtho(false)
   }
   private val grid = Grid(25, 15)
-  private val avatar: GridOccupant = GridOccupant.Player(
+  private val avatar: GridOccupant.Player = GridOccupant.Player(
       x = 0,
       y = 0,
       image = playerImage)
@@ -172,13 +173,14 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     class Movable(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image, canMove = true)
     class Immovable(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
     class Clutter(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
-    class Player(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image, canMove = true)
+    class Player(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image, canMove = true) {
+      var keys: Int = 0
+    }
     class Door(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
 
   }
 
-  class AvatarInputProcessor(private val avatar: GridOccupant, private val items: MutableList<GridOccupant>) : KtxInputAdapter {
-    private var keys: Int = 0
+  class AvatarInputProcessor(private val avatar: GridOccupant.Player, private val items: MutableList<GridOccupant>) : KtxInputAdapter {
 
     override fun keyDown(keycode: Int): Boolean {
       val movement = when (keycode) {
@@ -203,11 +205,11 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
         if (wanted.overlaps(otherOccupant)) {
           if (otherOccupant is GridOccupant.Consumable) {
             consumedItems.add(otherOccupant)
-            keys += 1
-            println("Picked up a key, you now have $keys keys")
-          } else if (otherOccupant is GridOccupant.Door && keys > 0) {
+            avatar.keys += 1
+            println("Picked up a key, you now have ${avatar.keys} keys")
+          } else if (otherOccupant is GridOccupant.Door && avatar.keys > 0) {
             consumedItems.add(otherOccupant)
-            keys -= 1
+            avatar.keys -= 1
           } else if (!occupant.canOverlap(otherOccupant) && !attemptMove(otherOccupant, movement)) {
             canMove = false
           }
