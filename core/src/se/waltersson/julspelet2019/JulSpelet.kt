@@ -3,15 +3,18 @@ package se.waltersson.julspelet2019
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import com.badlogic.gdx.Screen
+import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.OrthographicCamera
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
+import com.badlogic.gdx.math.Interpolation
 import ktx.app.KtxGame
 import ktx.app.KtxInputAdapter
 import ktx.app.KtxScreen
 import ktx.graphics.use
+import kotlin.math.min
 
 class JulSpelet : KtxGame<Screen>() {
   lateinit var font: BitmapFont
@@ -91,9 +94,10 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     x.....xx
     xxxxxxx.
   """.trimIndent()
+  private val textReceiver = TextReceiver()
 
   override fun show() {
-    Gdx.input.inputProcessor = AvatarInputProcessor(avatar, items)
+    Gdx.input.inputProcessor = AvatarInputProcessor(avatar, items, textReceiver)
     initializeMap()
   }
 
@@ -126,6 +130,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
       renderGround(batch)
       renderItems(batch)
       renderPlayer(batch)
+      renderTexts(batch, delta)
     }
   }
 
@@ -145,6 +150,20 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     items.forEach {
       batch.draw(it.image, it.x * 32f, it.y * 32f)
     }
+  }
+
+  private fun renderTexts(batch: SpriteBatch, delta: Float) {
+    val completeTexts = mutableListOf<TextReceiver.TextAnimation>()
+    textReceiver.texts.forEach {
+      it.update(delta)
+      val color: Color = font.color
+      font.setColor(color.r, color.g, color.b, it.alpha)
+      font.draw(batch, it.text, 100f, 100f)
+      if (it.complete) {
+        completeTexts.add(it)
+      }
+    }
+    textReceiver.texts.removeAll(completeTexts)
   }
 
   data class Grid(val width: Int, val height: Int)
@@ -176,11 +195,44 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     class Player(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image, canMove = true) {
       var keys: Int = 0
     }
+
     class Door(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
 
   }
 
-  class AvatarInputProcessor(private val avatar: GridOccupant.Player, private val items: MutableList<GridOccupant>) : KtxInputAdapter {
+  class TextReceiver {
+    val texts = mutableListOf<TextAnimation>()
+
+    fun showText(text: String) {
+      texts.add(TextAnimation(text))
+    }
+
+    class TextAnimation(val text: String, private val lifeTime: Float = 2f) {
+      private var elapsed: Float = 0f
+      private var easeTime: Float = 0.2f
+      val complete: Boolean
+        get() = elapsed >= lifeTime
+      private val easeIn: Interpolation = Interpolation.circleIn
+      private val easeOut: Interpolation = Interpolation.circleOut
+
+      fun update(delta: Float) {
+        elapsed += delta
+      }
+
+      val alpha: Float
+        get() {
+          if (elapsed <= easeTime) {
+            return easeIn.apply(min(1f, elapsed / easeTime))
+          } else if (elapsed > (lifeTime - easeTime)) {
+            return easeOut.apply(min(1f, (lifeTime - elapsed) / easeTime))
+          }
+          return 1f
+        }
+    }
+  }
+
+  class AvatarInputProcessor(private val avatar: GridOccupant.Player, private val items: MutableList<GridOccupant>,
+                             private val textReceiver: TextReceiver) : KtxInputAdapter {
 
     override fun keyDown(keycode: Int): Boolean {
       val movement = when (keycode) {
@@ -206,7 +258,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
           if (otherOccupant is GridOccupant.Consumable) {
             consumedItems.add(otherOccupant)
             avatar.keys += 1
-            println("Picked up a key, you now have ${avatar.keys} keys")
+            textReceiver.showText("Picked up a key, you now have ${avatar.keys} key${if (avatar.keys > 1) "s" else ""}")
           } else if (otherOccupant is GridOccupant.Door && avatar.keys > 0) {
             consumedItems.add(otherOccupant)
             avatar.keys -= 1
