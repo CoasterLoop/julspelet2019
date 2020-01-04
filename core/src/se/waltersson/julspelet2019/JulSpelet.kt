@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.OrthographicCamera
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.BitmapFont
+import com.badlogic.gdx.graphics.g2d.Sprite
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.math.Interpolation
 import ktx.app.KtxGame
@@ -65,6 +66,26 @@ class MainMenuScreen(private val game: JulSpelet) : KtxScreen {
   }
 }
 
+private val hardLevel = """
+    ...x..kx
+    P..o...x
+    ...x.o.x
+    xxxxx^x.
+    x.....xx
+    ko....dd
+    x.....xx
+    xxxxxxx.
+  """.trimIndent()
+private val powerLineLevel = """
+    ..............
+    ..............
+    .....0........
+    .....1........
+    .....2........
+    P....3........
+    ..............
+  """.trimIndent()
+
 class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   private val batch = julSpelet.batch
   private val font = BitmapFont()
@@ -73,6 +94,8 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   private val brickWallImage = Texture(Gdx.files.internal("BrickWall.png"))
   private val keyImage = Texture(Gdx.files.internal("GoldenKey.png"))
   private val doorImage = Texture(Gdx.files.internal("BrickWallLocked.png"))
+  private val powerlineRightOffImage = Texture(Gdx.files.internal("PowerlineRightOff.png"))
+  private val powerlineLeftOffImage = Texture(Gdx.files.internal("PowerlineLeftOff.png"))
   private val grass = Texture(Gdx.files.internal("Grass.png"))
   private val rockyGrass = Texture(Gdx.files.internal("RockyGrass.png"))
   private val camera = OrthographicCamera(800f, 480f).apply {
@@ -84,29 +107,23 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
       y = 0,
       image = playerImage)
   private val items = mutableListOf<GridOccupant>()
-  private val hardLevel = """
-    ...x..kx
-    P..o...x
-    ...x.o.x
-    xxxxx^x.
-    x.....xx
-    ko....dd
-    x.....xx
-    xxxxxxx.
-  """.trimIndent()
   private val textReceiver = TextReceiver()
 
   override fun show() {
-    Gdx.input.inputProcessor = AvatarInputProcessor(avatar, items, textReceiver)
-    initializeMap()
+    Gdx.input.inputProcessor = AvatarInputProcessor(avatar, items, textReceiver, this)
+    initializeMap(hardLevel)
   }
 
-  private fun initializeMap() {
+  private fun initializeMap(level: String) {
     items.clear()
-    hardLevel.lines().forEachIndexed { y, line ->
+    level.lines().forEachIndexed { y, line ->
       line.forEachIndexed { x, square ->
         when (square) {
           'o' -> items.add(GridOccupant.Movable(x, y, boxImage))
+          '0' -> items.add(GridOccupant.Movable(x, y, powerlineRightOffImage))
+          '1' -> items.add(GridOccupant.Movable(x, y, powerlineLeftOffImage))
+          '2' -> items.add(GridOccupant.Movable(x, y, powerlineRightOffImage, 180f))
+          '3' -> items.add(GridOccupant.Movable(x, y, powerlineLeftOffImage, 180f))
           'x' -> items.add(GridOccupant.Immovable(x, y, brickWallImage))
           'd' -> items.add(GridOccupant.Door(x, y, doorImage))
           'k' -> items.add(GridOccupant.Consumable(x, y, keyImage))
@@ -125,8 +142,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
 
     camera.update()
-    batch.projectionMatrix = camera.combined
-    batch.use { batch ->
+    batch.use(camera) { batch ->
       renderGround(batch)
       renderItems(batch)
       renderPlayer(batch)
@@ -148,7 +164,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
 
   private fun renderItems(batch: SpriteBatch) {
     items.forEach {
-      batch.draw(it.image, it.x * 32f, it.y * 32f)
+      it.addToBatch(batch)
     }
   }
 
@@ -187,9 +203,19 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
       var y: Int,
       val image: Texture,
       val canMove: Boolean = false) {
+    open fun addToBatch(batch: SpriteBatch) {
+      batch.draw(image, x * 32f, y * 32f)
+    }
 
     class Consumable(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
-    class Movable(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image, canMove = true)
+    class Movable(x: Int, y: Int, image: Texture, private val rotation: Float = 0f) : GridOccupant(x, y, image, canMove = true) {
+      private val sprite: Sprite = Sprite(image)
+      override fun addToBatch(batch: SpriteBatch) {
+        sprite.setPosition(x * 32f, y * 32f)
+        sprite.rotation = rotation
+        sprite.draw(batch)
+      }
+    }
     class Immovable(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
     class Clutter(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
     class Player(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image, canMove = true) {
@@ -232,7 +258,8 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   }
 
   class AvatarInputProcessor(private val avatar: GridOccupant.Player, private val items: MutableList<GridOccupant>,
-                             private val textReceiver: TextReceiver) : KtxInputAdapter {
+                             private val textReceiver: TextReceiver,
+                             private val game: AdventureGameScreen) : KtxInputAdapter {
 
     override fun keyDown(keycode: Int): Boolean {
       val movement = when (keycode) {
@@ -241,6 +268,10 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
         Input.Keys.DOWN -> Movement.Down()
         Input.Keys.UP -> Movement.Up()
         else -> Movement.Nothing()
+      }
+      when (keycode) {
+        Input.Keys.NUM_1 -> game.initializeMap(hardLevel)
+        Input.Keys.NUM_2 -> game.initializeMap(powerLineLevel)
       }
       attemptMove(avatar, movement)
       return true
