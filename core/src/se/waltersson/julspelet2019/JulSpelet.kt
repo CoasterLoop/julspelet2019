@@ -17,6 +17,8 @@ import ktx.app.KtxScreen
 import ktx.graphics.use
 import kotlin.math.min
 
+interface MovableItem
+
 class JulSpelet : KtxGame<Screen>() {
   lateinit var font: BitmapFont
     private set
@@ -95,7 +97,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   private val keyImage = Texture(Gdx.files.internal("GoldenKey.png"))
   private val doorImage = Texture(Gdx.files.internal("BrickWallLocked.png"))
   private val powerlineRightOffImage = Texture(Gdx.files.internal("PowerlineRightOff.png"))
-  private val powerlineLeftOffImage = Texture(Gdx.files.internal("PowerlineLeftOff.png"))
+  private val powerlineLeftOffImage = Texture(Gdx.files.internal("PowerLineLeftOff.png"))
   private val grass = Texture(Gdx.files.internal("Grass.png"))
   private val rockyGrass = Texture(Gdx.files.internal("RockyGrass.png"))
   private val camera = OrthographicCamera(800f, 480f).apply {
@@ -208,7 +210,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     }
 
     class Consumable(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
-    class Movable(x: Int, y: Int, image: Texture, private val rotation: Float = 0f) : GridOccupant(x, y, image, canMove = true) {
+    class Movable(x: Int, y: Int, image: Texture, private val rotation: Float = 0f) : GridOccupant(x, y, image, canMove = true), MovableItem {
       private val sprite: Sprite = Sprite(image)
       override fun addToBatch(batch: SpriteBatch) {
         sprite.setPosition(x * 32f, y * 32f)
@@ -218,7 +220,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     }
     class Immovable(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
     class Clutter(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
-    class Player(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image, canMove = true) {
+    class Player(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image, canMove = true), MovableItem {
       var keys: Int = 0
     }
 
@@ -279,7 +281,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
 
     private fun attemptMove(occupant: GridOccupant, movement: Movement): Boolean {
       val wanted = occupant.positionAfterMoving(movement)
-      if (!occupant.canMove || wanted.outOfBounds()) {
+      if (occupant !is MovableItem || wanted.outOfBounds()) {
         return false
       }
       var canMove = true
