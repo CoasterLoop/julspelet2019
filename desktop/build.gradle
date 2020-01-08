@@ -1,12 +1,15 @@
-apply plugin: "kotlin"
+project(":desktop") {
 
-sourceCompatibility = 1.7
-sourceSets.main.java.srcDirs = [ "src/" ]
-sourceSets.main.resources.srcDirs = ["../core/assets"]
+    apply plugin: "kotlin"
+    apply plugin: "org.mini2Dx.parcl"
 
-project.ext.mainClassName = "se.waltersson.julspelet2019.desktop.DesktopLauncher"
-project.ext.assetsDir = new File("../core/assets")
+    sourceCompatibility = 1.7
+    sourceSets.main.java.srcDirs = ["src/"]
+    sourceSets.main.resources.srcDirs = ["../core/assets"]
 
+    mainClassName = "se.waltersson.julspelet2019.desktop.DesktopLauncherKt"
+    ext.assetsDir = new File("../core/assets")
+/*
 task run(dependsOn: classes, type: JavaExec) {
     main = project.mainClassName
     classpath = sourceSets.main.runtimeClasspath
@@ -14,25 +17,46 @@ task run(dependsOn: classes, type: JavaExec) {
     workingDir = project.assetsDir
     ignoreExitValue = true
 }
-
-task debug(dependsOn: classes, type: JavaExec) {
-    main = project.mainClassName
-    classpath = sourceSets.main.runtimeClasspath
-    standardInput = System.in
-    workingDir = project.assetsDir
-    ignoreExitValue = true
-    debug = true
-}
-
-task dist(type: Jar) {
-    manifest {
-        attributes 'Main-Class': project.mainClassName
+*/
+    task debug(dependsOn: classes, type: JavaExec) {
+        main = project.mainClassName
+        classpath = sourceSets.main.runtimeClasspath
+        standardInput = System.in
+        workingDir = project.assetsDir
+        ignoreExitValue = true
+        debug = true
     }
-    from {
-        configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+
+    task dist(type: Jar) {
+        manifest {
+            attributes 'Main-Class': project.mainClassName
+        }
+        from {
+            configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+        }
+        with jar
     }
-    with jar
+
+    dist.dependsOn classes
+    dist.archiveBaseName.set('templum')
+
+    parcl {
+        exe {
+            exeName = "templum"
+            zipName = 'templum.zip'
+        }
+
+        app {
+            appName = "Templum"
+            icon = ""
+            applicationCategory = "public.app-category.adventure-games"
+            displayName = 'Templum'
+            identifier = 'se.waltersson.templum'
+            copyright = 'Copyright 2020 Waltersson'
+        }
+
+        linux {
+            binName = "myapplication"
+        }
+    }
 }
-
-
-dist.dependsOn classes

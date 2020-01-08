@@ -11,6 +11,7 @@ buildscript {
     }
     dependencies {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+        classpath group: 'org.mini2Dx', name: 'parcl', version: '1.6.1'
     }
 }
 
