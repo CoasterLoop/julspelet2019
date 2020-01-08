@@ -64,7 +64,6 @@ class MainMenuScreen(private val game: JulSpelet) : KtxScreen {
 
 class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   private val batch = julSpelet.batch
-  private val font = julSpelet.font
   private val playerImage = Texture(Gdx.files.internal("JoshuaFrontStationary.png"))
   private val boxImage = Texture(Gdx.files.internal("BoxWood.png"))
   private val brickWallImage = Texture(Gdx.files.internal("BrickWall.png"))
@@ -80,7 +79,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
       x = 0,
       y = 0,
       image = playerImage)
-  private val items = mutableListOf<GridOccupant>()
+  private val itemGrid = mutableMapOf<Position, GridOccupant>()
   private val hardLevel = """
     ...x...
     P..o...
@@ -93,20 +92,20 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   """.trimIndent()
 
   override fun show() {
-    Gdx.input.inputProcessor = AvatarInputProcessor(avatar, items)
+    Gdx.input.inputProcessor = AvatarInputProcessor(avatar, itemGrid)
     initializeMap()
   }
 
   private fun initializeMap() {
-    items.clear()
+    itemGrid.clear()
     hardLevel.lines().forEachIndexed { y, line ->
       line.forEachIndexed { x, square ->
         when (square) {
-          'o' -> items.add(GridOccupant.Movable(x, y, boxImage))
-          'x' -> items.add(GridOccupant.Immovable(x, y, brickWallImage))
-          'd' -> items.add(GridOccupant.Immovable(x, y, doorImage))
-          'k' -> items.add(GridOccupant.Consumable(x, y, keyImage))
-          '^' -> items.add(GridOccupant.Clutter(x, y, rockyGrass))
+          'o' -> itemGrid[Position(x, y)] = GridOccupant.Movable(x, y, boxImage)
+          'x' -> itemGrid[Position(x, y)] = GridOccupant.Immovable(x, y, brickWallImage)
+          'd' -> itemGrid[Position(x, y)] = GridOccupant.Immovable(x, y, doorImage)
+          'k' -> itemGrid[Position(x, y)] = GridOccupant.Consumable(x, y, keyImage)
+          '^' -> itemGrid[Position(x, y)] = GridOccupant.Clutter(x, y, rockyGrass)
           'P' -> {
             avatar.x = x
             avatar.y = y
@@ -142,18 +141,14 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   }
 
   private fun renderItems(batch: SpriteBatch) {
-    items.forEach {
-      batch.draw(it.image, it.x * 32f, it.y * 32f)
+    itemGrid.forEach { (pos, occupant) ->
+      batch.draw(occupant.image, pos.x * 32f, pos.y * 32f)
     }
   }
 
   data class Grid(val width: Int, val height: Int)
 
-  data class Position(val x: Int, val y: Int) {
-    fun overlaps(occupant: GridOccupant): Boolean {
-      return occupant.x == this.x && occupant.y == this.y
-    }
-  }
+  data class Position(val x: Int, val y: Int)
 
   sealed class Movement(val x: Int, val y: Int) {
     class Left : Movement(-1, 0)
@@ -176,7 +171,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     class Player(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image, canMove = true)
   }
 
-  class AvatarInputProcessor(private val avatar: GridOccupant, private val items: MutableList<GridOccupant>) : KtxInputAdapter {
+  class AvatarInputProcessor(private val avatar: GridOccupant, private val itemGrid: MutableMap<Position, GridOccupant>) : KtxInputAdapter {
     override fun keyDown(keycode: Int): Boolean {
       val movement = when (keycode) {
         Input.Keys.LEFT -> Movement.Left()
@@ -195,19 +190,18 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
         return false
       }
       var canMove = true
-      val consumedItems = mutableListOf<GridOccupant.Consumable>()
-      items.forEach { otherOccupant ->
-        if (wanted.overlaps(otherOccupant)) {
-          if (otherOccupant is GridOccupant.Consumable) {
-            consumedItems.add(otherOccupant)
-          } else if (!occupant.canOverlap(otherOccupant) && !attemptMove(otherOccupant, movement)) {
-            canMove = false
-          }
+      val otherOccupant = itemGrid[wanted]
+      if (otherOccupant != null) {
+        if (otherOccupant is GridOccupant.Consumable) {
+          itemGrid.remove(wanted)
+        } else if (!occupant.canOverlap(otherOccupant) && !attemptMove(otherOccupant, movement)) {
+          canMove = false
         }
       }
       if (canMove) {
+        itemGrid.remove(Position(occupant.x, occupant.y))
+        itemGrid[wanted] = occupant
         occupant.move(movement)
-        items.removeAll(consumedItems)
       }
       return canMove
     }
@@ -226,10 +220,6 @@ private fun AdventureGameScreen.Position.outOfBounds(): Boolean {
 
 private fun AdventureGameScreen.GridOccupant.positionAfterMoving(movement: AdventureGameScreen.Movement): AdventureGameScreen.Position {
   return AdventureGameScreen.Position(this.x + movement.x, this.y + movement.y)
-}
-
-private fun AdventureGameScreen.GridOccupant.overlaps(occupant: AdventureGameScreen.GridOccupant): Boolean {
-  return this.x == occupant.x && this.y == occupant.y
 }
 
 private fun AdventureGameScreen.GridOccupant.move(movement: AdventureGameScreen.Movement) {
