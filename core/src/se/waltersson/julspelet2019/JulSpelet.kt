@@ -70,21 +70,21 @@ class MainMenuScreen(private val game: JulSpelet) : KtxScreen {
 
 private val hardLevel = """
     ...x..kx
-    P..o...x
+    S..o...x
     ...x.o.x
     xxxxx^x.
     x.....xx
-    ko....dd
+    ko....DD
     x.....xx
     xxxxxxx.
   """.trimIndent()
 private val powerLineLevel = """
     ..............
     ..............
-    .....0........
+    .....0.P......
     .....1........
     .....2........
-    P....3........
+    S....3........
     ..............
   """.trimIndent()
 
@@ -98,6 +98,9 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   private val doorImage = Texture(Gdx.files.internal("BrickWallLocked.png"))
   private val powerlineRightOffImage = Texture(Gdx.files.internal("PowerlineRightOff.png"))
   private val powerlineLeftOffImage = Texture(Gdx.files.internal("PowerLineLeftOff.png"))
+  private val powerlineWallRightOffImage = Texture(Gdx.files.internal("PowerlineWallRightOff.png"))
+  private val powerlineWallLeftOffImage = Texture(Gdx.files.internal("PowerlineWallLeftOff.png"))
+  private val powerBlockImage = Texture(Gdx.files.internal("PowerBlock.png"))
   private val grass = Texture(Gdx.files.internal("Grass.png"))
   private val rockyGrass = Texture(Gdx.files.internal("RockyGrass.png"))
   private val camera = OrthographicCamera(800f, 480f).apply {
@@ -122,15 +125,16 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
       line.forEachIndexed { x, square ->
         when (square) {
           'o' -> items.add(GridOccupant.Movable(x, y, boxImage))
-          '0' -> items.add(GridOccupant.Movable(x, y, powerlineRightOffImage))
-          '1' -> items.add(GridOccupant.Movable(x, y, powerlineLeftOffImage))
-          '2' -> items.add(GridOccupant.Movable(x, y, powerlineRightOffImage, 180f))
-          '3' -> items.add(GridOccupant.Movable(x, y, powerlineLeftOffImage, 180f))
+          'P' -> items.add(GridOccupant.Movable(x, y, powerBlockImage))
+          '0' -> items.add(GridOccupant.Movable(x, y, powerlineWallRightOffImage))
+          '1' -> items.add(GridOccupant.Movable(x, y, powerlineWallLeftOffImage))
+          '2' -> items.add(GridOccupant.Movable(x, y, powerlineWallRightOffImage, 180f))
+          '3' -> items.add(GridOccupant.Movable(x, y, powerlineWallLeftOffImage, 180f))
           'x' -> items.add(GridOccupant.Immovable(x, y, brickWallImage))
-          'd' -> items.add(GridOccupant.Door(x, y, doorImage))
+          'D' -> items.add(GridOccupant.Door(x, y, doorImage))
           'k' -> items.add(GridOccupant.Consumable(x, y, keyImage))
           '^' -> items.add(GridOccupant.Clutter(x, y, rockyGrass))
-          'P' -> {
+          'S' -> {
             avatar.x = x
             avatar.y = y
           }
