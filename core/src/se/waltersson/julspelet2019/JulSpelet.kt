@@ -96,10 +96,10 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   private val brickWallImage = Texture(Gdx.files.internal("BrickWall.png"))
   private val keyImage = Texture(Gdx.files.internal("GoldenKey.png"))
   private val doorImage = Texture(Gdx.files.internal("BrickWallLocked.png"))
-  private val powerlineRightOffImage = Texture(Gdx.files.internal("PowerlineRightOff.png"))
-  private val powerlineLeftOffImage = Texture(Gdx.files.internal("PowerLineLeftOff.png"))
   private val powerlineWallRightOffImage = Texture(Gdx.files.internal("PowerlineWallRightOff.png"))
+  private val powerlineWallRightOnImage = Texture(Gdx.files.internal("PowerLineWallRightOn.png"))
   private val powerlineWallLeftOffImage = Texture(Gdx.files.internal("PowerlineWallLeftOff.png"))
+  private val powerlineWallLeftOnImage = Texture(Gdx.files.internal("PowerlineWallLeftOn.png"))
   private val powerBlockImage = Texture(Gdx.files.internal("PowerBlock.png"))
   private val grass = Texture(Gdx.files.internal("Grass.png"))
   private val rockyGrass = Texture(Gdx.files.internal("RockyGrass.png"))
@@ -128,10 +128,10 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
         when (square) {
           'o' -> occupantsAtPosition.add(GridOccupant.Movable(x, y, boxImage))
           'P' -> occupantsAtPosition.add(GridOccupant.Movable(x, y, powerBlockImage))
-          '0' -> occupantsAtPosition.add(GridOccupant.Movable(x, y, powerlineWallRightOffImage))
-          '1' -> occupantsAtPosition.add(GridOccupant.Movable(x, y, powerlineWallLeftOffImage))
-          '2' -> occupantsAtPosition.add(GridOccupant.Movable(x, y, powerlineWallRightOffImage, 180f))
-          '3' -> occupantsAtPosition.add(GridOccupant.Movable(x, y, powerlineWallLeftOffImage, 180f))
+          '0' -> occupantsAtPosition.add(GridOccupant.Powerline(x, y, powerlineWallRightOnImage, powerlineWallRightOffImage))
+          '1' -> occupantsAtPosition.add(GridOccupant.Powerline(x, y, powerlineWallLeftOnImage, powerlineWallLeftOffImage))
+          '2' -> occupantsAtPosition.add(GridOccupant.Powerline(x, y, powerlineWallRightOnImage, powerlineWallRightOffImage, 180f))
+          '3' -> occupantsAtPosition.add(GridOccupant.Powerline(x, y, powerlineWallLeftOnImage, powerlineWallLeftOffImage, 180f))
           'x' -> occupantsAtPosition.add(GridOccupant.Immovable(x, y, brickWallImage))
           'D' -> occupantsAtPosition.add(GridOccupant.Door(x, y, doorImage))
           'k' -> occupantsAtPosition.add(GridOccupant.Consumable(x, y, keyImage))
@@ -173,7 +173,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   private fun renderItems(batch: SpriteBatch) {
     itemGrid.forEach { (pos, occupants) ->
       for (occupant in occupants) {
-        batch.draw(occupant.image, pos.x * 32f, pos.y * 32f)
+        occupant.addToBatch(batch)
       }
     }
   }
@@ -207,14 +207,13 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   sealed class GridOccupant(
       var x: Int,
       var y: Int,
-      val image: Texture,
-      val canMove: Boolean = false) {
+      val image: Texture) {
     open fun addToBatch(batch: SpriteBatch) {
       batch.draw(image, x * 32f, y * 32f)
     }
 
     class Consumable(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
-    class Movable(x: Int, y: Int, image: Texture, private val rotation: Float = 0f) : GridOccupant(x, y, image, canMove = true), MovableItem {
+    class Movable(x: Int, y: Int, image: Texture, private val rotation: Float = 0f) : GridOccupant(x, y, image), MovableItem {
       private val sprite: Sprite = Sprite(image)
       override fun addToBatch(batch: SpriteBatch) {
         sprite.setPosition(x * 32f, y * 32f)
@@ -224,12 +223,23 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     }
     class Immovable(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
     class Clutter(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
-    class Player(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image, canMove = true), MovableItem {
+    class Player(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image), MovableItem {
       var keys: Int = 0
     }
 
     class Door(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
 
+    class Powerline(x: Int, y: Int, imageOn: Texture, imageOff: Texture, private val rotation: Float = 0f) : GridOccupant(x, y, imageOff), MovableItem {
+      var powered: Boolean = false
+      private val spriteOn: Sprite = Sprite(imageOn)
+      private val spriteOff: Sprite = Sprite(imageOff)
+      override fun addToBatch(batch: SpriteBatch) {
+        val sprite = if (powered) spriteOn else spriteOff
+        sprite.setPosition(x * 32f, y * 32f)
+        sprite.rotation = rotation
+        sprite.draw(batch)
+      }
+    }
   }
 
   class TextReceiver {
@@ -289,19 +299,16 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
         return false
       }
       var canMove = true
-      val otherOccupants = itemGrid[wanted]
-      if (otherOccupants != null) {
-        otherOccupants.forEach { otherOccupant ->
-          if (otherOccupant is GridOccupant.Consumable) {
-            itemGrid[wanted]?.remove(otherOccupant)
-            avatar.keys += 1
-            textReceiver.showText("Picked up a key, you now have ${avatar.keys} key${if (avatar.keys > 1) "s" else ""}")
-          } else if (otherOccupant is GridOccupant.Door && avatar.keys > 0) {
-            itemGrid[wanted]?.remove(otherOccupant)
-            avatar.keys -= 1
-          } else if (!occupant.canOverlap(otherOccupant) && !attemptMove(otherOccupant, movement)) {
-            canMove = false
-          }
+      itemGrid[wanted]?.forEach { otherOccupant ->
+        if (otherOccupant is GridOccupant.Consumable) {
+          itemGrid[wanted]?.remove(otherOccupant)
+          avatar.keys += 1
+          textReceiver.showText("Picked up a key, you now have ${avatar.keys} key${if (avatar.keys > 1) "s" else ""}")
+        } else if (otherOccupant is GridOccupant.Door && avatar.keys > 0) {
+          itemGrid[wanted]?.remove(otherOccupant)
+          avatar.keys -= 1
+        } else if (!occupant.canOverlap(otherOccupant) && !attemptMove(otherOccupant, movement)) {
+          canMove = false
         }
       }
       if (canMove) {
@@ -331,5 +338,8 @@ private fun AdventureGameScreen.GridOccupant.positionAfterMoving(movement: Adven
 private fun AdventureGameScreen.GridOccupant.move(movement: AdventureGameScreen.Movement) {
   x += movement.x
   y += movement.y
+  if (this is AdventureGameScreen.GridOccupant.Powerline) {
+    powered = !powered
+  }
 }
 
