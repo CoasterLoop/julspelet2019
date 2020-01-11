@@ -121,6 +121,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
   private val textReceiver = TextReceiver()
 
   private fun initializeMap(level: String) {
+    avatar.keys = 0
     itemGrid.clear()
     level.lines().forEachIndexed { y, line ->
       line.forEachIndexed { x, square ->
@@ -300,7 +301,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
       }
       var canMove = true
       itemGrid[wanted]?.forEach { otherOccupant ->
-        if (otherOccupant is GridOccupant.Consumable) {
+        if (occupant is GridOccupant.Player && otherOccupant is GridOccupant.Consumable) {
           itemGrid[wanted]?.remove(otherOccupant)
           avatar.keys += 1
           textReceiver.showText("Picked up a key, you now have ${avatar.keys} key${if (avatar.keys > 1) "s" else ""}")
