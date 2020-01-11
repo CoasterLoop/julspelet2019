@@ -112,6 +112,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
       y = 0,
       image = playerImage)
   private val itemGrid = mutableMapOf<Position, MutableSet<GridOccupant>>()
+  private val powerSources = mutableListOf<GridOccupant.PowerSource>()
 
   override fun show() {
     Gdx.input.inputProcessor = AvatarInputProcessor(avatar, itemGrid, textReceiver, this)
@@ -128,7 +129,11 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
         val occupantsAtPosition = itemGrid.getOrPut(Position(x, y), { mutableSetOf() })
         when (square) {
           'o' -> occupantsAtPosition.add(GridOccupant.Movable(x, y, boxImage))
-          'P' -> occupantsAtPosition.add(GridOccupant.Movable(x, y, powerBlockImage))
+          'P' -> {
+            val powerSource = GridOccupant.PowerSource(x, y, powerBlockImage)
+            occupantsAtPosition.add(powerSource)
+            powerSources.add(powerSource)
+          }
           '0' -> occupantsAtPosition.add(GridOccupant.Powerline(x, y, powerlineWallRightOnImage, powerlineWallRightOffImage))
           '1' -> occupantsAtPosition.add(GridOccupant.Powerline(x, y, powerlineWallLeftOnImage, powerlineWallLeftOffImage))
           '2' -> occupantsAtPosition.add(GridOccupant.Powerline(x, y, powerlineWallRightOnImage, powerlineWallRightOffImage, 180f))
@@ -222,6 +227,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
         sprite.draw(batch)
       }
     }
+
     class Immovable(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
     class Clutter(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
     class Player(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image), MovableItem {
@@ -229,6 +235,8 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
     }
 
     class Door(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image)
+
+    class PowerSource(x: Int, y: Int, image: Texture) : GridOccupant(x, y, image), MovableItem
 
     class Powerline(x: Int, y: Int, imageOn: Texture, imageOff: Texture, private val rotation: Float = 0f) : GridOccupant(x, y, imageOff), MovableItem {
       var powered: Boolean = false
@@ -273,6 +281,7 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
         }
     }
   }
+
   class AvatarInputProcessor(private val avatar: GridOccupant.Player,
                              private val itemGrid: MutableMap<Position, MutableSet<GridOccupant>>,
                              private val textReceiver: TextReceiver,
@@ -290,8 +299,41 @@ class AdventureGameScreen(julSpelet: JulSpelet) : KtxScreen {
         Input.Keys.NUM_1 -> game.initializeMap(hardLevel)
         Input.Keys.NUM_2 -> game.initializeMap(powerLineLevel)
       }
-      attemptMove(avatar, movement)
+      if (movement !is Movement.Nothing) {
+        val didMove = attemptMove(avatar, movement)
+        if (didMove) {
+          recalculatePowerGrid(game.powerSources, game.itemGrid)
+        }
+      }
       return true
+    }
+
+    private fun recalculatePowerGrid(powerSources: MutableList<GridOccupant.PowerSource>, itemGrid: MutableMap<Position, MutableSet<GridOccupant>>) {
+      itemGrid
+          .flatMap { it.value }
+          .filterIsInstance<GridOccupant.Powerline>()
+          .forEach { it.powered = false }
+      powerSources.forEach { powerSource ->
+        powerAllNeighbours(powerSource, itemGrid)
+      }
+    }
+
+    private fun powerAllNeighbours(occupant: GridOccupant, itemGrid: MutableMap<Position, MutableSet<GridOccupant>>) {
+      findNeighbours(occupant, itemGrid)
+          .filterIsInstance<GridOccupant.Powerline>()
+          .filter { !it.powered }
+          .forEach {
+            it.powered = true
+            powerAllNeighbours(it, itemGrid)
+          }
+    }
+
+    private fun findNeighbours(occupant: GridOccupant, potentialNeighbours: MutableMap<Position, MutableSet<GridOccupant>>): Collection<GridOccupant> {
+      val left = potentialNeighbours[occupant.positionAfterMoving(Movement.Left())]
+      val right = potentialNeighbours[occupant.positionAfterMoving(Movement.Right())]
+      val down = potentialNeighbours[occupant.positionAfterMoving(Movement.Down())]
+      val up = potentialNeighbours[occupant.positionAfterMoving(Movement.Up())]
+      return listOf(left, right, down, up).mapNotNull { it?.toList() }.flatten()
     }
 
     private fun attemptMove(occupant: GridOccupant, movement: Movement): Boolean {
